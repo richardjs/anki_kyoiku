@@ -96,6 +96,15 @@ kanji_model = genanki.Model(
         'qfmt': '{{Kanji}}',
         'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br>{{Example Words}}<br><small>grade {{Grade}}'
     }],
+    css='''
+	.card {
+	    font-family: arial;
+	    font-size: 20px;
+	    text-align: center;
+	    color: black;
+	    background-color: white;
+	}
+    '''
 )
 
 deck = genanki.Deck(
