@@ -143,8 +143,12 @@ kanji_model = genanki.Model(
     ],
     templates=[{
         'name': 'Kanji meaning',
-        'qfmt': '{{Kanji}}',
+        'qfmt': 'Meaning of:<br>{{Kanji}}',
         'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br><br><small>grade {{Grade}}'
+    }, {
+        'name': 'Word reading',
+        'qfmt': '{{#Example Word}}Reading for:<br>{{Example Word}}{{/Example Word}}',
+        'afmt': '{{FrontSide}}<hr id="answer">{{Example Word Entry}}'
     }],
     css='''
         .card {
