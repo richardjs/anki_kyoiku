@@ -19,6 +19,18 @@ Then run the script:
 
 The generated file will be at `kyoiku.apkg`, ready for import into Anki.
 
+# Recordings
+
+The script can download recordings for example words from
+[Forvo](https://forvo.com/). To do so, the environment variable FORVO_KEY must
+be set to your [Forvo API](https://api.forvo.com/) key. After setting that, run
+the script.
+
+Chances are you will hit your daily Forvo API limit before all the recordings
+are downloaded. In that case, run the script after your limit resets. The script
+will pick up downloads where it left off. You can reimport the deck into Anki
+after each wave of downloads, and it should include the new files as expected.
+
 # Data sources
 
 This project makes use of the KANJIDIC and JMdict-EDICT projects, both property

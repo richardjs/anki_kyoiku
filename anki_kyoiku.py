@@ -1,9 +1,18 @@
+import json
+import os
+import ssl
+import urllib.error
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 
 import genanki
 
 
 MAX_GRADE = 6
+
+FORVO_API = 'https://apifree.forvo.com/key/2676e4f71e3649035a68dd8ce3cd8c4e/format/json/language/ja/action/standard-pronunciation/word/'
+FORVO_KEY = os.environ.get('FORVO_KEY')
 
 
 class Word:
@@ -19,6 +28,7 @@ class Kanji:
         self.meanings = meanings
         self.grade = grade
         self.words = []
+        self.recording = None
 
     def add_word(self, word):
         self.words.append(word)
@@ -120,14 +130,70 @@ for word in word_entries.values():
 
         kanji.add_word(Word(word, reading, senses))
 
-print('building Anki package...')
-
 grades = [[] for _ in range(MAX_GRADE)]
 for kanji in kanji_list:
     grades[kanji.grade - 1].append(kanji)
 
 for grade in grades:
     grade.sort()
+
+
+if FORVO_KEY:
+    print('downloading recordings...')
+
+    try:
+        os.mkdir('media')
+    except FileExistsError:
+        pass
+
+    api_limit_hit = False
+    for grade in grades:
+        for kanji in grade:
+            if api_limit_hit:
+                continue
+
+            if kanji.words:
+                word = kanji.words[0].word
+            else:
+                continue
+
+            filename = os.path.join('media', word+'.mp3')
+            if os.path.exists(filename):
+                continue
+
+            try:
+                print('downloading recording for %s...' % word)
+                r = urllib.request.urlopen(
+                    FORVO_API + urllib.parse.quote(word)).read()
+                data = json.loads(r)
+                items = data['items']
+                if not items:
+                    print('no recording for', word)
+                    f = open(filename, 'w')
+                    f.close()
+                    continue
+                mp3_url = items[0]['pathmp3']
+                urllib.request.urlretrieve(mp3_url, filename)
+            except urllib.error.HTTPError as e:
+                print(e)
+                api_limit_hit = True
+
+media_files = []
+for kanji in kanji_list:
+    if kanji.words:
+        word = kanji.words[0].word
+    else:
+        continue
+
+    filename = word+'.mp3'
+    if not os.path.exists(os.path.join('media', filename)):
+        continue
+
+    kanji.recording = filename
+    media_files.append(filename)
+
+
+print('building Anki package...')
 
 kanji_model = genanki.Model(
     1698738421,
@@ -144,11 +210,11 @@ kanji_model = genanki.Model(
     templates=[{
         'name': 'Kanji meaning',
         'qfmt': 'Meaning of:<br>{{Kanji}}',
-        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br><br><small>grade {{Grade}}'
+        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br>{{Example Word Recording}}<br><small>grade {{Grade}}'
     }, {
         'name': 'Word reading',
         'qfmt': '{{#Example Word}}Reading for:<br>{{Example Word}}{{/Example Word}}',
-        'afmt': '{{FrontSide}}<hr id="answer">{{Example Word Entry}}'
+        'afmt': '{{FrontSide}}<hr id="answer">{{Example Word Entry}}<br>{{Example Word Recording}}'
     }],
     css='''
         .card {
@@ -164,8 +230,12 @@ kanji_model = genanki.Model(
         td {
             border-top: 1px solid #555;
             border-bottom: 1px solid #555;
-            padding: 3px;
+            font-size: 12px;
+            padding: 1px;
             text-align: left;
+        }
+        .entry-definition {
+            font-size: 10px
         }
      '''
 )
@@ -183,10 +253,15 @@ for grade in grades:
         example_entry = '<table>'
         for word in kanji.words:
             example_entry += '<tr>'
-            example_entry += '<td>%s</td>' % word.reading
-            example_entry += '<td>%s</td>' % '<br>'.join(word.senses)
+            example_entry += '<td><span style="white-space:nowrap;">%s</span></td>' % word.reading
+            example_entry += '<td class="entry-definition">%s</td>' % '<br>'.join(word.senses)
             example_entry += '</tr>'
         example_entry += '</table>'
+
+        if kanji.recording:
+            recording = '[sound:%s]' % kanji.recording
+        else:
+            recording = ''
 
         note = KanjiNote(
             model=kanji_model,
@@ -195,8 +270,7 @@ for grade in grades:
                 ', '.join(kanji.meanings),
                 example_word,
                 example_entry,
-                # TODO: add Forvo recordings
-                '',
+                recording,
                 # TODO: add decomposition
                 '',
                 str(kanji.grade),
@@ -204,4 +278,7 @@ for grade in grades:
         )
         deck.add_note(note)
 
-genanki.Package(deck).write_to_file('kyoiku.apkg')
+os.chdir('media')
+package = genanki.Package(deck)
+package.media_files = media_files
+package.write_to_file('../kyoiku.apkg')
