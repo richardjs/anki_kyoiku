@@ -94,7 +94,9 @@ for entry in root.findall('character'):
 
     kanji = Kanji(character, meanings, grade)
     kanji_list.append(kanji)
-    words[word] = kanji
+    if word not in words:
+        words[word] = []
+    words[word].append(kanji)
 
 print('getting example word definitions...')
 
@@ -107,8 +109,6 @@ for word in word_entries.values():
 
         if word not in words:
             continue
-
-        kanji = words[word]
 
         # just grabbing the first reb and r_ele should be fine
         reading = entry.find('r_ele').find('reb').text
@@ -128,7 +128,8 @@ for word in word_entries.values():
                     'pos').text
             senses.append(sense_entry)
 
-        kanji.add_word(Word(word, reading, senses))
+        for kanji in words[word]:
+            kanji.add_word(Word(word, reading, senses))
 
 grades = [[] for _ in range(MAX_GRADE)]
 for kanji in kanji_list:
@@ -254,7 +255,8 @@ for grade in grades:
         for word in kanji.words:
             example_entry += '<tr>'
             example_entry += '<td><span style="white-space:nowrap;">%s</span></td>' % word.reading
-            example_entry += '<td class="entry-definition">%s</td>' % '<br>'.join(word.senses)
+            example_entry += '<td class="entry-definition">%s</td>' % '<br>'.join(
+                word.senses)
             example_entry += '</tr>'
         example_entry += '</table>'
 
