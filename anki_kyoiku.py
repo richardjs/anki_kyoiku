@@ -7,9 +7,10 @@ MAX_GRADE = 6
 
 
 class Word:
-    def __init__(self, reading, gloss):
+    def __init__(self, word, reading, senses):
+        self.word = word
         self.reading = reading
-        self.gloss = gloss
+        self.senses = senses
 
 
 class Kanji:
@@ -32,10 +33,27 @@ class KanjiNote(genanki.Note):
         return genanki.guid_for(self.fields[0])
 
 
-print('loading kanji data...')
+print('loading data files...')
 
-characters = {}
+word_entries = {}
+tree = ET.parse('data/JMdict_e')
+root = tree.getroot()
+for entry in root.findall('entry'):
+    try:
+        # we're only looking for the first kanji element, which should be the most common
+        word = entry.find('k_ele').find('keb').text
+    except:
+        continue
 
+    if not word:
+        continue
+
+    if word not in word_entries:
+        word_entries[word] = []
+    word_entries[word].append(entry)
+
+kanji_list = []
+words = {}
 tree = ET.parse('data/kanjidic2.xml')
 root = tree.getroot()
 for entry in root.findall('character'):
@@ -51,36 +69,65 @@ for entry in root.findall('character'):
 
     meanings = []
     for meaning in entry.find('reading_meaning').find('rmgroup').findall('meaning'):
+        # TODO add option to build for different languages
         if 'm_lang' in meaning.attrib:
             continue
         meanings.append(meaning.text)
 
-    characters[character] = Kanji(character, meanings, grade)
+    for line in open('data/wikipedia-20150422-lemmas.tsv'):
+        if character not in line:
+            continue
+        word = line.split()[-1]
+        # make sure we have a dictionary entry for the word before using it
+        if word in word_entries:
+            break
 
-tree = ET.parse('data/JMdict_e')
-root = tree.getroot()
-for entry in root.findall('entry'):
-    try:
-        character = entry.find('k_ele').find('keb').text
-    except:
-        continue
+    kanji = Kanji(character, meanings, grade)
+    kanji_list.append(kanji)
+    words[word] = kanji
 
-    if character not in characters:
-        continue
+print('getting example word definitions...')
 
-    kanji = characters[character]
-    reading = entry.find('r_ele').find('reb').text
-    gloss = entry.find('sense').find('gloss').text
-    kanji.add_word(Word(reading, gloss))
+for word in word_entries.values():
+    for entry in word:
+        try:
+            word = entry.find('k_ele').find('keb').text
+        except:
+            continue
+
+        if word not in words:
+            continue
+
+        kanji = words[word]
+
+        # just grabbing the first reb and r_ele should be fine
+        reading = entry.find('r_ele').find('reb').text
+
+        senses = []
+        for sense in entry.findall('sense'):
+            if sense.find('misc'):
+                # misc indicates colloquialisms, usually kana usage, etc.
+                # if the sense has this, we might just want to ignore it (to keep things simple)
+                # TODO add options to include different misc attributes in the data
+                continue
+            sense_entry = ', '.join(
+                gloss.text for gloss in sense.findall('gloss'))
+            pos = sense.find('pos')
+            if pos != None:
+                sense_entry += ' <small><i>%s</i></small>' % sense.find(
+                    'pos').text
+            senses.append(sense_entry)
+
+        kanji.add_word(Word(word, reading, senses))
+
+print('building Anki package...')
 
 grades = [[] for _ in range(MAX_GRADE)]
-for k in characters.values():
-    grades[k.grade - 1].append(k)
+for kanji in kanji_list:
+    grades[kanji.grade - 1].append(kanji)
 
 for grade in grades:
     grade.sort()
-
-print('building Anki package...')
 
 kanji_model = genanki.Model(
     1698738421,
@@ -88,23 +135,35 @@ kanji_model = genanki.Model(
     fields=[
         {'name': 'Kanji'},
         {'name': 'Meaning'},
-        {'name': 'Example Words'},
+        {'name': 'Example Word'},
+        {'name': 'Example Word Entry'},
+        {'name': 'Example Word Recording'},
+        {'name': 'Decomposition'},
         {'name': 'Grade'},
     ],
     templates=[{
         'name': 'Kanji meaning',
         'qfmt': '{{Kanji}}',
-        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br>{{Example Words}}<br><small>grade {{Grade}}'
+        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br><br><small>grade {{Grade}}'
     }],
     css='''
-	.card {
-	    font-family: arial;
-	    font-size: 20px;
-	    text-align: center;
-	    color: black;
-	    background-color: white;
-	}
-    '''
+        .card {
+            font-family: arial;
+            font-size: 20px;
+            text-align: center;
+            color: black;
+            background-color: white;
+        }
+        table {
+            margin: 0px auto;
+        }
+        td {
+            border-top: 1px solid #555;
+            border-bottom: 1px solid #555;
+            padding: 3px;
+            text-align: left;
+        }
+     '''
 )
 
 deck = genanki.Deck(
@@ -114,13 +173,28 @@ deck = genanki.Deck(
 
 for grade in grades:
     for kanji in grade:
+        example_word = ''
+        if len(kanji.words) > 0:
+            example_word = kanji.words[0].word
+        example_entry = '<table>'
+        for word in kanji.words:
+            example_entry += '<tr>'
+            example_entry += '<td>%s</td>' % word.reading
+            example_entry += '<td>%s</td>' % '<br>'.join(word.senses)
+            example_entry += '</tr>'
+        example_entry += '</table>'
+
         note = KanjiNote(
             model=kanji_model,
             fields=[
                 kanji.character,
                 ', '.join(kanji.meanings),
-                '<table>'+'<tr>'.join(['<td>%s</td><td>%s</td>' % (word.reading, word.gloss)
-                                       for word in kanji.words])+'</table>',
+                example_word,
+                example_entry,
+                # TODO: add Forvo recordings
+                '',
+                # TODO: add decomposition
+                '',
                 str(kanji.grade),
             ],
         )
