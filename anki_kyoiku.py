@@ -138,6 +138,16 @@ for kanji in kanji_list:
 for grade in grades:
     grade.sort()
 
+decompositions = {}
+for line in open('data/kradfile-u'):
+    if line.startswith('#'):
+        continue
+    kanji, decomposition = line.strip().split(' : ')
+    decomposition = decomposition.split()
+    if kanji in decomposition:
+        decomposition.remove(kanji)
+    decomposition = ' '.join(decomposition)
+    decompositions[kanji] = decomposition
 
 if FORVO_KEY:
     print('downloading recordings...')
@@ -211,7 +221,7 @@ kanji_model = genanki.Model(
     templates=[{
         'name': 'Kanji meaning',
         'qfmt': 'Meaning of:<br>{{Kanji}}',
-        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br>{{Example Word Recording}}<br><small>grade {{Grade}}'
+        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br>{{Example Word Recording}}<br><small>{{Decomposition}}</small><br><small>grade {{Grade}}</small>'
     }, {
         'name': 'Word reading',
         'qfmt': '{{#Example Word}}Reading for:<br>{{Example Word}}{{/Example Word}}',
@@ -273,8 +283,7 @@ for grade in grades:
                 example_word,
                 example_entry,
                 recording,
-                # TODO: add decomposition
-                '',
+                decompositions[kanji.character],
                 str(kanji.grade),
             ],
         )

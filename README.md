@@ -38,6 +38,10 @@ of the Electronic Dictionary Research and Development Group. The projects are
 used in conformance with the EDRDG's license, available at
 [http://www.edrdg.org/edrdg/licence.html](http://www.edrdg.org/edrdg/licence.html).
 
+This project makes use of the file kradfile-u, created by Jim Rose. It is used
+in comformance with its license, available at
+[http://www.kanjicafe.com/kradfile_license.htm](http://www.kanjicafe.com/kradfile_license.htm).
+
 This project also makes use of a Japanese frequency list from
 [Wiktionary](https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists/Japanese2015_10000),
 available via the [Create Commons Attribution-ShareAlike
