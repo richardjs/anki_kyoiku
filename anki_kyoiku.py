@@ -64,18 +64,16 @@ for entry in root.findall('entry'):
 
 kanji_list = []
 words = {}
+kanji_meanings = {}
 tree = ET.parse('data/kanjidic2.xml')
 root = tree.getroot()
 for entry in root.findall('character'):
-    try:
-        grade = int(entry.find('misc').find('grade').text)
-    except:
-        continue
-
-    if grade > MAX_GRADE:
-        continue
-
     character = entry.find('literal').text
+
+    try:
+        entry.find('reading_meaning').find('rmgroup').findall('meaning')
+    except AttributeError:
+        continue
 
     meanings = []
     for meaning in entry.find('reading_meaning').find('rmgroup').findall('meaning'):
@@ -83,6 +81,15 @@ for entry in root.findall('character'):
         if 'm_lang' in meaning.attrib:
             continue
         meanings.append(meaning.text)
+
+    kanji_meanings[character] = meanings
+
+    try:
+        grade = int(entry.find('misc').find('grade').text)
+    except:
+        continue
+    if grade > MAX_GRADE:
+        continue
 
     for line in open('data/wikipedia-20150422-lemmas.tsv'):
         if character not in line:
@@ -221,7 +228,7 @@ kanji_model = genanki.Model(
     templates=[{
         'name': 'Kanji meaning',
         'qfmt': 'Meaning of:<br>{{Kanji}}',
-        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b><br>{{Example Word Entry}}<br>{{Example Word Recording}}<br><small>{{Decomposition}}</small><br><small>grade {{Grade}}</small>'
+        'afmt': '{{FrontSide}}<hr id="answer">{{Meaning}}<br><br><b>{{Example Word}}</b> {{Example Word Recording}}<br>{{Example Word Entry}}<small>{{Decomposition}}</small><br><small>grade {{Grade}}</small>'
     }, {
         'name': 'Word reading',
         'qfmt': '{{#Example Word}}Reading for:<br>{{Example Word}}{{/Example Word}}',
@@ -246,7 +253,11 @@ kanji_model = genanki.Model(
             text-align: left;
         }
         .entry-definition {
-            font-size: 10px
+            font-size: 10px;
+        }
+        .entry-other-kanji {
+            font-size 10px;
+            border: none;
         }
      '''
 )
@@ -268,7 +279,19 @@ for grade in grades:
             example_entry += '<td class="entry-definition">%s</td>' % '<br>'.join(
                 word.senses)
             example_entry += '</tr>'
-        example_entry += '</table>'
+        example_entry += '</table><br>'
+
+        other_kanji_table = '<table>'
+        for character in example_word:
+            if character == kanji.character:
+                continue
+            if character not in kanji_meanings:
+                continue
+            other_kanji_table += '<tr><td class="entry-other-kanji">%s</td><td class="entry-other-kanji">%s</td></tr>' % (
+                character, ', '.join(kanji_meanings[character]))
+        other_kanji_table += '</table>'
+        if '<tr>' in other_kanji_table:
+            example_entry += other_kanji_table
 
         if kanji.recording:
             recording = '[sound:%s]' % kanji.recording
