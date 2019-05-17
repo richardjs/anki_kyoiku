@@ -23,9 +23,10 @@ class Word:
 
 
 class Kanji:
-    def __init__(self, character, meanings, grade):
+    def __init__(self, character, meanings, readings, grade):
         self.character = character
         self.meanings = meanings
+        self.readings = readings
         self.grade = grade
         self.words = []
         self.recording = None
@@ -65,6 +66,7 @@ for entry in root.findall('entry'):
 kanji_list = []
 words = {}
 kanji_meanings = {}
+kanji_readings = {}
 tree = ET.parse('data/kanjidic2.xml')
 root = tree.getroot()
 for entry in root.findall('character'):
@@ -81,8 +83,14 @@ for entry in root.findall('character'):
         if 'm_lang' in meaning.attrib:
             continue
         meanings.append(meaning.text)
-
     kanji_meanings[character] = meanings
+
+    readings = []
+    for reading in entry.find('reading_meaning').find('rmgroup').findall('reading'):
+        if reading.attrib['r_type'] not in ['ja_on', 'ja_kun']:
+            continue
+        readings.append(reading.text)
+    kanji_readings[character] = readings
 
     try:
         grade = int(entry.find('misc').find('grade').text)
@@ -99,7 +107,7 @@ for entry in root.findall('character'):
         if word in word_entries:
             break
 
-    kanji = Kanji(character, meanings, grade)
+    kanji = Kanji(character, meanings, readings, grade)
     kanji_list.append(kanji)
     if word not in words:
         words[word] = []
@@ -283,12 +291,18 @@ for grade in grades:
 
         other_kanji_table = '<table>'
         for character in example_word:
-            if character == kanji.character:
-                continue
+            # if character == kanji.character:
+            #    continue
             if character not in kanji_meanings:
                 continue
-            other_kanji_table += '<tr><td class="entry-other-kanji">%s</td><td class="entry-other-kanji">%s</td></tr>' % (
+            other_kanji_table += '<tr>'
+            other_kanji_table += '<td class="entry-other-kanji">%s</td><td class="entry-other-kanji">%s</td>' % (
                 character, ', '.join(kanji_meanings[character]))
+            wrapped_readings = [
+                '<span style="white-space: nowrap;">%s</span>' % r for r in kanji_readings[character]]
+            other_kanji_table += '<td class="entry-other-kanji">%s</td>' % (
+                ', '.join(wrapped_readings))
+            other_kanji_table += '</tr>'
         other_kanji_table += '</table>'
         if '<tr>' in other_kanji_table:
             example_entry += other_kanji_table
